@@ -5,11 +5,14 @@ import tensorflow as tf
 
 file_name = "HIGGS.csv"
 
+#data = set_length(file_name)
+#data = data.values.compute()
+
 data = pd.read_csv(file_name, nrows=10000)
 data = data.to_numpy()
 
 print(np.shape(data))
-print(data[10, 0])
+print(data[0, :5])
 
 
 
