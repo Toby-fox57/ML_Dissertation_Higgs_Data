@@ -3,13 +3,16 @@ import pandas as pd
 import tensorflow as tf
 
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
 from tensorflow import keras
 
 file_dir = "SUSY.csv"
-low, high = np.arange(1, 9), np.arange(9, 19)  # Defines the columns which have high-level and low-level data.
-
 num_rows = 100000  # Defines the amount of collision data used.
-data_level, is_deep = high, 0  # Set whether to use high or low level data and if to use a deep or shallow NN.
+
+low, high = [np.arange(1, 9), "low"], [np.arange(9, 19), "high"]  # Defines the columns which have high-level and
+# low-level data.
+data_level, is_deep = low, 1  # Set whether to use high or low level data and if to use a deep or shallow NN.
+num_components = 0
 
 
 def test_and_train(data_level, num_rows, file_name):
@@ -24,6 +27,19 @@ def test_and_train(data_level, num_rows, file_name):
     return x_train, x_test, y_train, y_test
 
 
+def principle_component_analysis(train, test, num_components):
+    if num_components > 0:
+        pca = PCA(n_components=num_components)
+        pca.fit(train), pca.fit(test)
+
+        pca_train, pca_test = pca.transform(train), pca.transform(test)
+
+        return pca_train, pca_test
+
+    else:
+        return train, test
+
+
 def build_model(input_dim, is_deep):
     if is_deep == 0:
         n = 1  # Sets the number of hidden layers to 1 if it is a shallow NN.
@@ -31,12 +47,12 @@ def build_model(input_dim, is_deep):
     else:
         n = 5  # Sets the number of hidden layers to 5 if it is a deep NN.
 
-    input_initializer = keras.initializers.RandomNormal(mean=0., stddev=0.1)  # The weights for the input layer were
-    # initialized using a random normal distribution with a mean of 0 and std of 0.1.
-    hidden_initializer = keras.initializers.RandomNormal(mean=0., stddev=0.05)  # The weights for the input layer were
-    # initialized using a random normal distribution with a mean of 0 and std of 0.05.
-    output_initializer = keras.initializers.RandomNormal(mean=0., stddev=0.001)  # The weights for the input layer were
-    # initialized using a random normal distribution with a mean of 0 and std of 0.001.
+    input_initializer = keras.initializers.RandomNormal(mean=0., stddev=0.1, seed=None)  # The weights for the input
+    # layer were initialized using a random normal distribution with a mean of 0 and std of 0.1.
+    hidden_initializer = keras.initializers.RandomNormal(mean=0., stddev=0.05, seed=None)  # The weights for the input
+    # layer were initialized using a random normal distribution with a mean of 0 and std of 0.05.
+    output_initializer = keras.initializers.RandomNormal(mean=0., stddev=0.001, seed=None)  # The weights for the input
+    # layer were initialized using a random normal distribution with a mean of 0 and std of 0.001.
 
     model = keras.Sequential()
     model.add(
@@ -58,7 +74,7 @@ def build_model(input_dim, is_deep):
 
 
 def compiler(model):
-    sgd = keras.optimizers.SGD(lr=0.05, decay=1e-5, momentum=0.9)  # Defines the gradient descent again
+    sgd = keras.optimizers.SGD(learning_rate=0.05, decay=1e-5, momentum=0.9)  # Defines the gradient descent again
     # taken from the report.
 
     model.compile(loss='binary_crossentropy',  # Uses binary cross entropy as the results is a binary answer.
@@ -69,7 +85,7 @@ def compiler(model):
 
 
 def scheduler(epoch, current_learning_rate):
-    if current_learning_rate > 1e-6:   # Define a learing rate schedule, such that the learning rate decays by
+    if current_learning_rate > 1e-6:  # Define a learning rate schedule, such that the learning rate decays by
         return current_learning_rate / 1.0000002  # a factor of 1.0000002 until the learning rate reaches 1e-6.
 
     else:
@@ -84,12 +100,33 @@ def model_fit_test(model, x_train, x_test, y_train, y_test):
 
     model.fit(x_train, y_train, batch_size=100, epochs=1000, callbacks=[lr_schedule, early_stop])  # fits the model
     # using the training data.
-    model.evaluate(x_test, y_test, batch_size=100)  # evaluates the trained model against the test data.
+    model.evaluate(x_test, y_test)  # evaluates the trained model against the test data.
 
 
-x_train, x_test, y_train, y_test = test_and_train(data_level, num_rows, file_dir)
+def main(file_dir, data_level, is_deep, num_components):
+    x_train, x_test, y_train, y_test = test_and_train(data_level[0], num_rows, file_dir)
+    x_train, x_test = principle_component_analysis(x_train, x_test, num_components)
 
-model = build_model(np.shape(data_level)[0], is_deep)
-model = compiler(model)
+    model = build_model(np.shape(x_train)[1], is_deep)
+    model = compiler(model)
 
-model_fit_test(model, x_train, x_test, y_train, y_test)
+    learning = ["shallow", "deep"]
+    print("Running:", learning[is_deep], "learning for", data_level[1], "-level data.")
+    if num_components > 0:
+        print("Using pca with,", num_components, "components.")
+
+    model_fit_test(model, x_train, x_test, y_train, y_test)
+
+    return 0
+
+
+main(file_dir, data_level, is_deep, num_components)
+
+# Shallow low-level --> training: 80.55%,  385 Epochs / testing: 78.94%
+# Shallow high-level --> training: 79.19%,   131 Epochs / testing: 78.92%
+
+# Deep low-level --> training: 99.06%, 306 Epochs / testing: 74.64% ??
+# Deep high-level --> training: 95.63%,  494 Epochs / testing: 72.87% ??
+
+# Deep low-level, 2 components --> training: 57.42%, 50 Epochs / testing: 55.16%
+# Deep high-level, 2 components --> training: 71.29%, 70 Epochs / testing: 70.77%
