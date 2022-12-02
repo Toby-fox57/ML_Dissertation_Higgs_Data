@@ -130,18 +130,6 @@ def model_fit_test(model, model_name, x_train, x_test, y_train, y_test, epochs=E
     return history, evaluation
 
 
-def receiver_operating_characteristic(model, model_name, x_test, y_test):
-    prediction = model.predict(x_test)
-
-    fpr, tpr, thresholds = roc_curve(y_test, prediction)
-    auc = area_under_curve(fpr, tpr)
-
-    auc = [auc[0]]
-
-    roc_results = pd.DataFrame({"fpr": fpr, "tpr": tpr, "auc": auc.extend([''] * (len(fpr) - 1))})
-    roc_results.to_csv("ROC/"+model_name + "_ROC.csv")
-
-
 def print_statement(data_name, is_deep):
     """
     Prints the model use and creates the model name.
@@ -152,16 +140,16 @@ def print_statement(data_name, is_deep):
     learning = ["shallow", "deep"]
     print("Running:", learning[is_deep], "learning for", data_name, "-level data.")
 
-    model_name = str("History/" + learning[is_deep] + "_" + data_name)
+    model_name = str(learning[is_deep] + "_" + data_name)
 
     return model_name
 
 
-def save_results(history, evaluation, model_name):
+def Learning_curve(history, evaluation, model_name):
     eval_dataframe = pd.DataFrame({'epoch': ['testing'], 'accuracy': [evaluation[1]], 'loss': [evaluation[0]],
                                    'val_accuracy': [0], 'val_loss': [0]})
 
-    results = pd.read_csv(model_name + ".csv")
+    results = pd.read_csv("History/"+model_name + ".csv")
     results = pd.concat([results, eval_dataframe], ignore_index=True)
     results.to_csv(model_name + ".csv", index=False)
 
@@ -178,7 +166,18 @@ def save_results(history, evaluation, model_name):
         ax.set_xlim(0, np.max(history.epoch))
         ax.legend(fontsize=12)
 
-    plt.savefig(model_name + ".png")
+    plt.savefig("History/"+model_name + ".png")
+
+def receiver_operating_characteristic(model, model_name, x_test, y_test):
+    prediction = model.predict(x_test)
+
+    fpr, tpr, thresholds = roc_curve(y_test, prediction)
+    auc = area_under_curve(fpr, tpr)
+
+    auc = [auc] + ['']*(len(fpr) - 1)
+
+    roc_results = pd.DataFrame({"fpr": fpr, "tpr": tpr, "auc": auc})
+    roc_results.to_csv("ROC/"+model_name + "_ROC.csv", index=False)
 
 
 def model_run(data_level, is_deep):
@@ -199,32 +198,9 @@ def model_run(data_level, is_deep):
 
     history, evaluation = model_fit_test(model, model_name, x_train, x_test, y_train, y_test)
     receiver_operating_characteristic(model, model_name, x_test, y_test)
-    save_results(history, evaluation, model_name)
+    Learning_curve(history, evaluation, model_name)
 
     return evaluation
-
-
-def roc_graph_plotter(tpr, fpr, auc, is_deep, m):
-    depth, colours = ["shallow", "deep"], ["r", "b", "k"]
-
-    if m == 0:
-        fig_roc = plt.figure()
-        ax_roc = fig_roc.add_subplot(111)
-
-    # ax_roc.plot([0, 1], [0, 1], 'k--')
-    ax_roc.plot(tpr, 1 - fpr, label=data_levels[m][1] + " " + depth[is_deep] + " AUC = {0:.3f}".format(auc),
-                color=colours[m])
-
-    ax_roc.set_xlabel('Signal efficiency', fontsize=12)
-    ax_roc.set_ylabel('Background rejection', fontsize=12)
-    ax_roc.set_title("ROC curve SUSY dataset using a " + depth[is_deep] + " Network", fontsize=12)
-    ax_roc.set_xlim = (-0.01, 1.01)
-    ax_roc.grid(True, which="both")
-    ax_roc.legend(loc='lower right', fontsize=12)
-
-    if m == 2:
-        plt.savefig("ROC\ROC_curve_" + depth[n] + ".pdf")
-        plt.show()
 
 
 def main():
