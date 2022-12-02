@@ -5,19 +5,16 @@ import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
-from sklearn.metrics import roc_curve
-from sklearn.metrics import auc as area_under_curve
 from tensorflow import keras
 
 FILE_DIR = "SUSY.csv"
-EPOCHS, BATCH = 5, 100
+EPOCHS, BATCH = 150, 100
 
 low = [np.arange(1, 9), "low"]  # Defines the column indexes for the low-level data.
 high = [np.arange(9, 19), "high"]  # Defines the column indexes for the high-level data.
 combined = [np.arange(1, 19), "comb"]  # Defines the column indexes for the combined data.
 
 data_levels = [low, high, combined]
-depth = ["Shallow", "Deep"]
 
 
 def principle_component_analysis(train, test, num_components):
@@ -52,9 +49,12 @@ def test_and_train(col_num, file_name=FILE_DIR):
     data = pd.read_csv(file_name, usecols=col_num).astype(float)
     label = pd.read_csv(file_name, usecols=[0]).astype(int)
 
+    print(len(np.where(label==1)[0]) / len(label))
+
     data = keras.utils.normalize(data)
 
     x_train, x_test, y_train, y_test = train_test_split(data, label, test_size=0.2)
+    #y_train, y_test = keras.utils.to_categorical(y_train), keras.utils.to_categorical(y_test)
 
     return x_train, x_test, y_train, y_test
 
@@ -130,18 +130,6 @@ def model_fit_test(model, model_name, x_train, x_test, y_train, y_test, epochs=E
     return history, evaluation
 
 
-def receiver_operating_characteristic(model, model_name, x_test, y_test):
-    prediction = model.predict(x_test)
-
-    fpr, tpr, thresholds = roc_curve(y_test, prediction)
-    auc = area_under_curve(fpr, tpr)
-
-    auc = [auc[0]]
-
-    roc_results = pd.DataFrame({"fpr": fpr, "tpr": tpr, "auc": auc.extend([''] * (len(fpr) - 1))})
-    roc_results.to_csv("ROC/"+model_name + "_ROC.csv")
-
-
 def print_statement(data_name, is_deep):
     """
     Prints the model use and creates the model name.
@@ -165,23 +153,26 @@ def save_results(history, evaluation, model_name):
     results = pd.concat([results, eval_dataframe], ignore_index=True)
     results.to_csv(model_name + ".csv", index=False)
 
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
 
-    metric = ["accuracy", "loss"]
+    ax[0].plot(history.epoch, history.history["accuracy"], label='Train')
+    ax[0].plot(history.epoch, history.history["val_" + "accuracy"], linestyle="--", label='Val')
+    ax[0].set_xlabel("epochs")
+    ax[0].set_ylabel("accuracy")
+    ax[0].set_xlim(0, np.max(history.epoch))
+    ax[0].legend()
 
-    for i, ax in enumerate(axes):
-        ax.plot(history.epoch, history.history[metric[i]], label='Train')
-        ax.plot(history.epoch, history.history["val_" + metric[i]], linestyle="--", label='Val')
-        ax.set_xlabel("epochs", fontsize=12)
-        ax.set_ylabel(metric[i], fontsize=12)
-        ax.set_title("Learning curve for SUSY dataset, measure " + metric[i], fontsize=12)
-        ax.set_xlim(0, np.max(history.epoch))
-        ax.legend(fontsize=12)
+    ax[1].plot(history.history['loss'], label='Train')
+    ax[1].plot(history.epoch, history.history["val_" + "loss"], linestyle="--", label='Val')
+    ax[1].set_xlabel("epochs")
+    ax[1].set_ylabel("loss")
+    ax[1].set_xlim(0, np.max(history.epoch))
+    ax[1].legend()
 
     plt.savefig(model_name + ".png")
 
 
-def model_run(data_level, is_deep):
+def main(data_level, is_deep):
     """
     Get the training, testing and validation data.
     Converts the dimensions of the data to the number of components if pca is used.
@@ -198,41 +189,17 @@ def model_run(data_level, is_deep):
     model = compiler(model)
 
     history, evaluation = model_fit_test(model, model_name, x_train, x_test, y_train, y_test)
-    receiver_operating_characteristic(model, model_name, x_test, y_test)
     save_results(history, evaluation, model_name)
 
     return evaluation
 
 
-def roc_graph_plotter(tpr, fpr, auc, is_deep, m):
-    depth, colours = ["shallow", "deep"], ["r", "b", "k"]
-
-    if m == 0:
-        fig_roc = plt.figure()
-        ax_roc = fig_roc.add_subplot(111)
-
-    # ax_roc.plot([0, 1], [0, 1], 'k--')
-    ax_roc.plot(tpr, 1 - fpr, label=data_levels[m][1] + " " + depth[is_deep] + " AUC = {0:.3f}".format(auc),
-                color=colours[m])
-
-    ax_roc.set_xlabel('Signal efficiency', fontsize=12)
-    ax_roc.set_ylabel('Background rejection', fontsize=12)
-    ax_roc.set_title("ROC curve SUSY dataset using a " + depth[is_deep] + " Network", fontsize=12)
-    ax_roc.set_xlim = (-0.01, 1.01)
-    ax_roc.grid(True, which="both")
-    ax_roc.legend(loc='lower right', fontsize=12)
-
-    if m == 2:
-        plt.savefig("ROC\ROC_curve_" + depth[n] + ".pdf")
-        plt.show()
-
-
-def main():
+def iterate():
     evaluations = np.empty((0, 2))
 
-    for n in range(2):
-        for m in range(3):
-            model_evaluation = model_run(data_levels[m], n)
+    for n in range(3):
+        for m in range(2):
+            model_evaluation = main(data_levels[n], m)
             evaluations = np.vstack((evaluations, model_evaluation))
 
     results = pd.read_csv("Results.csv")
@@ -242,4 +209,4 @@ def main():
     return 0
 
 
-main()
+iterate()
