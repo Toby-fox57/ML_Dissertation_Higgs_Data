@@ -10,17 +10,17 @@ from sklearn.metrics import auc as area_under_curve
 from tensorflow import keras
 
 FILE_DIR = "SUSY.csv"
-EPOCHS, BATCH = 5, 100
+EPOCHS, BATCH = 150, 100
 
 low = [np.arange(1, 9), "low"]  # Defines the column indexes for the low-level data.
 high = [np.arange(9, 19), "high"]  # Defines the column indexes for the high-level data.
 combined = [np.arange(1, 19), "comb"]  # Defines the column indexes for the combined data.
 
-data_levels = [low, high, combined]
-depth = ["Shallow", "Deep"]
+DATA_LEVELS = [low, high, combined]
+pc = [6, 5, 9]
 
 
-def principle_component_analysis(train, test, num_components):
+def principal_component_analysis(train, test, num_components):
     """
     Changes the dimensions of the array from the input dimensions to the amount of principal components.
     :param train: Array of the train set with the input dimensions.
@@ -49,11 +49,10 @@ def test_and_train(col_num, file_name=FILE_DIR):
     :param file_name: String containing the file location
     :return: Arrays containing the data and labels that are used to train and test the model
     """
-    data = pd.read_csv(file_name, usecols=col_num).astype(float)
+    data = pd.read_csv(file_name, usecols=col_num)
     label = pd.read_csv(file_name, usecols=[0]).astype(int)
 
-    data = keras.utils.normalize(data)
-
+    data = keras.utils.normalize(data, axis=1)
     x_train, x_test, y_train, y_test = train_test_split(data, label, test_size=0.2)
 
     return x_train, x_test, y_train, y_test
@@ -83,10 +82,10 @@ def build_model(input_dim, is_deep):
     output_initializer = keras.initializers.RandomNormal(mean=0., stddev=0.001, seed=None)
 
     model = keras.Sequential()
-
     model.add(keras.layers.Dense(100, input_dim=input_dim, activation='tanh', kernel_initializer=input_initializer))
     for i in range(n):
-        model.add(keras.layers.Dense(100, activation='tanh', kernel_initializer=hidden_initializer))
+        model.add(
+            keras.layers.Dense(100, activation='tanh', kernel_initializer=hidden_initializer))
     model.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=output_initializer))
 
     return model
@@ -99,7 +98,7 @@ def compiler(model):
     :param model: The model.
     :return: The compiled model.
     """
-    sgd = keras.optimizers.SGD(learning_rate=0.005, momentum=0.9)
+    sgd = keras.optimizers.SGD(learning_rate=0.05, decay=1e-6, momentum=0.9)
 
     model.compile(loss='binary_crossentropy',
                   optimizer=sgd,
@@ -122,7 +121,8 @@ def model_fit_test(model, model_name, x_train, x_test, y_train, y_test, epochs=E
     :param epochs: Sets the number of epochs the model will train for.
     :param batch: Sets the size of the batches.
     """
-    csv_fit = keras.callbacks.CSVLogger(model_name + ".csv", separator=",", append=False)
+    log_dir = "History/" + model_name + ".csv"
+    csv_fit = keras.callbacks.CSVLogger(log_dir, separator=",", append=False)
     history = model.fit(x_train, y_train, validation_split=0.25, batch_size=batch, epochs=epochs, callbacks=[csv_fit])
 
     evaluation = model.evaluate(x_test, y_test)
@@ -130,7 +130,7 @@ def model_fit_test(model, model_name, x_train, x_test, y_train, y_test, epochs=E
     return history, evaluation
 
 
-def print_statement(data_name, is_deep):
+def print_statement(data_name, is_deep, pc):
     """
     Prints the model use and creates the model name.
     :param data_name: Array containing the string which says whether the network is shallow or deep.
@@ -140,19 +140,16 @@ def print_statement(data_name, is_deep):
     learning = ["shallow", "deep"]
     print("Running:", learning[is_deep], "learning for", data_name, "-level data.")
 
-    model_name = str(learning[is_deep] + "_" + data_name)
+    if pc == 0:
+        model_name = str(learning[is_deep] + "_" + data_name)
+        
+    else:
+        model_name = str(learning[is_deep] + "_" + data_name + "_" + str(pc))
 
     return model_name
 
 
-def Learning_curve(history, evaluation, model_name):
-    eval_dataframe = pd.DataFrame({'epoch': ['testing'], 'accuracy': [evaluation[1]], 'loss': [evaluation[0]],
-                                   'val_accuracy': [0], 'val_loss': [0]})
-
-    results = pd.read_csv("History/"+model_name + ".csv")
-    results = pd.concat([results, eval_dataframe], ignore_index=True)
-    results.to_csv(model_name + ".csv", index=False)
-
+def learning_curve(history, model_name):
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
 
     metric = ["accuracy", "loss"]
@@ -166,7 +163,8 @@ def Learning_curve(history, evaluation, model_name):
         ax.set_xlim(0, np.max(history.epoch))
         ax.legend(fontsize=12)
 
-    plt.savefig("History/"+model_name + ".png")
+    plt.savefig("History/" + model_name + ".pdf")
+
 
 def receiver_operating_characteristic(model, model_name, x_test, y_test):
     prediction = model.predict(x_test)
@@ -174,13 +172,11 @@ def receiver_operating_characteristic(model, model_name, x_test, y_test):
     fpr, tpr, thresholds = roc_curve(y_test, prediction)
     auc = area_under_curve(fpr, tpr)
 
-    auc = [auc] + ['']*(len(fpr) - 1)
-
-    roc_results = pd.DataFrame({"fpr": fpr, "tpr": tpr, "auc": auc})
-    roc_results.to_csv("ROC/"+model_name + "_ROC.csv", index=False)
+    roc_results = pd.DataFrame({"fpr": fpr, "tpr": tpr, "auc": [auc] + [''] * (len(fpr) - 1)})
+    roc_results.to_csv("ROC/" + model_name + "_ROC.csv", index=False)
 
 
-def model_run(data_level, is_deep):
+def model_run(data_level, is_deep, pc):
     """
     Get the training, testing and validation data.
     Converts the dimensions of the data to the number of components if pca is used.
@@ -191,14 +187,17 @@ def model_run(data_level, is_deep):
     :return: Integer, 0 if the code is successful.
     """
     x_train, x_test, y_train, y_test = test_and_train(data_level[0])
+    
+    if pc != 0:
+        x_train, x_test = principal_component_analysis(x_train, x_test, pc)
 
-    model_name = print_statement(data_level[1], is_deep)
+    model_name = print_statement(data_level[1], is_deep, pc)
     model = build_model(np.shape(x_train)[1], is_deep)
     model = compiler(model)
-
+    
     history, evaluation = model_fit_test(model, model_name, x_train, x_test, y_train, y_test)
     receiver_operating_characteristic(model, model_name, x_test, y_test)
-    Learning_curve(history, evaluation, model_name)
+    learning_curve(history, model_name)
 
     return evaluation
 
@@ -208,7 +207,7 @@ def main():
 
     for n in range(2):
         for m in range(3):
-            model_evaluation = model_run(data_levels[m], n)
+            model_evaluation = model_run(DATA_LEVELS[m], n, 0)
             evaluations = np.vstack((evaluations, model_evaluation))
 
     results = pd.read_csv("Results.csv")
@@ -218,4 +217,20 @@ def main():
     return 0
 
 
+def pca_main():
+    evaluations = np.empty((0, 2))
+
+    for n in range(2):
+        for m in range(3):
+            model_evaluation = model_run(DATA_LEVELS[m], n, pc[m])
+            evaluations = np.vstack((evaluations, model_evaluation))
+
+    results = pd.read_csv("PCA_Results.csv")
+    results['Accuracy'], results['Loss'] = evaluations[:, 1].tolist(), evaluations[:, 0].tolist()
+    results.to_csv("PCA_Results.csv", index=False)
+
+    return 0
+
+
 main()
+# pca_main()

@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 
 FILE_DIR = "SUSY.csv"
 
-LOW = [[1, 4, 7, 8], "low"]  # Defines the column indexes for the low-level data.
-HIGH = [np.arange(9, 19), "high"]  # Defines the column indexes for the high-level data.
-COMBINED = [np.arange(1, 19), "comb"]  # Defines the column indexes for the combined data.
+low = [[1, 4, 7, 8], "low"]  # Defines the column indexes for the low-level data.
+high = [np.arange(9, 19), "high"]  # Defines the column indexes for the high-level data.
+combined = [np.arange(1, 19), "comb"]  # Defines the column indexes for the combined data.
 
-DATA_LEVELS = [LOW, HIGH, COMBINED]
+DATA_LEVELS = [low, high, combined]
 
 
 def file_importer(col_num, file_name=FILE_DIR):
