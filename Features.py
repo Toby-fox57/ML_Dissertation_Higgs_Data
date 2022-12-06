@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-FILE_DIR = "SUSY.csv"
+FILE_DIR = "SUSY.csv.gz"
 
 low = [[1, 4, 7, 8], "low"]  # Defines the column indexes for the low-level data.
 high = [np.arange(9, 19), "high"]  # Defines the column indexes for the high-level data.
@@ -12,8 +12,8 @@ DATA_LEVELS = [low, high, combined]
 
 
 def file_importer(col_num, file_name=FILE_DIR):
-    label = pd.read_csv(file_name, usecols=[0]).astype(float)
-    data = pd.read_csv(file_name, usecols=col_num).astype(float)
+    data = pd.read_csv(file_name, nrows=100000, usecols=col_num, compression='gzip')
+    label = pd.read_csv(file_name, nrows=100000, usecols=[0], compression='gzip').astype(int)
 
     return label, data
 
@@ -22,7 +22,7 @@ def low_feature_analysis(data_level=DATA_LEVELS[0]):
     label, data = file_importer(data_level[0])
 
     feature_names = ["Lepton 1 $p_T$ (GeV)", "Lepton 2 $p_T$ (GeV)", "$E_{mis}$ (GeV)", ""]
-    label, data = label.to_numpy(), data.to_numpy()*100
+    label, data = label.to_numpy(), data.to_numpy() * 100
 
     signal, background = np.where(label == 1)[0], np.where(label == 0)[0]
 
@@ -32,7 +32,7 @@ def low_feature_analysis(data_level=DATA_LEVELS[0]):
     for i, col in enumerate(axes):
         for m, ax in enumerate(col):
 
-            n = i*2 + m
+            n = i * 2 + m
 
             ax.hist(data[signal, n], bins=100, histtype='step', label='signal', color='r',
                     weights=np.zeros_like(data[signal, n]) + 1. / data[signal, n].size)
@@ -41,7 +41,7 @@ def low_feature_analysis(data_level=DATA_LEVELS[0]):
             ax.set_ylabel("Fraction of events", fontsize=12)
             ax.set_xlabel(str(feature_names[n]), fontsize=12)
 
-            Line, Label = ax.get_legend_handles_labels()
+            line, label = ax.get_legend_handles_labels()
 
             ax.set_xlim(0, 200)
             if n != 1:
@@ -50,10 +50,10 @@ def low_feature_analysis(data_level=DATA_LEVELS[0]):
             if n == 3:
                 fig.delaxes(ax)
 
-    fig.suptitle("Diustribution of "+ data_level[1] + " level features of the SUSY data set", fontsize=12)
-    fig.legend(Line, Label, loc='lower right', fontsize=12)
+    fig.suptitle("Distribution of " + data_level[1] + " level features of the SUSY data set", fontsize=12)
+    fig.legend(line, label, bbox_to_anchor=[0.73, 0.43], fontsize=12)
 
-    plt.savefig("Features/" + data_level[1] + "_level.pdf")
+    plt.savefig("Features/" + data_level[1] + "_level.pdf", dpi=300)
     plt.show()
 
     return 0
@@ -64,7 +64,7 @@ def high_feature_analysis(data_level=DATA_LEVELS[1]):
 
     feature_names = ["Mis. $E_T^{rel}$", "Axial Mis. $E_T$", "$M_R$", r"$M_T^R$", "R", "$M_{T2}$", "$S_R$",
                      r"$M_{\Delta}^R$", r"$\Delta\phi^{\beta}_R$", r"$cos(\theta_{R+1})$"]
-    label, data = label.to_numpy(), data.to_numpy()*100
+    label, data = label.to_numpy(), data.to_numpy() * 100
     data[:, 4], data[:, 8:10] = data[:, 4] / 100, data[:, 8:10] / 100
 
     signal, background = np.where(label == 1)[0], np.where(label == 0)[0]
@@ -72,21 +72,20 @@ def high_feature_analysis(data_level=DATA_LEVELS[1]):
     fig, axes = plt.subplots(4, 3, figsize=(12, 9))
     fig.subplots_adjust(wspace=0.3, hspace=0.5)
 
-
     for i, col in enumerate(axes):
         for m, ax in enumerate(col):
 
-            n = i*3 + m
+            n = i * 3 + m
 
             if n == 10:
                 n = 9
 
                 ax.hist(data[signal, n], bins=50, histtype='step', label='signal', color='r',
-                              weights=np.zeros_like(data[signal, n]) + 1. / data[signal, n].size)
+                        weights=np.zeros_like(data[signal, n]) + 1. / data[signal, n].size)
                 ax.hist(data[background, n], bins=50, histtype='step', label='background', color='k',
-                              weights=np.zeros_like(data[background, n]) + 1. / data[background, n].size)
-                ax.set_ylabel("Fraction of events", fontsize=12)
-                ax.set_xlabel(str(feature_names[n]), fontsize=12)
+                        weights=np.zeros_like(data[background, n]) + 1. / data[background, n].size)
+                ax.set_ylabel("Fraction of events", fontsize=10)
+                ax.set_xlabel(str(feature_names[n]), fontsize=10)
 
                 ax.set_ylim(0, 0.1)
                 ax.set_xlim(0, 1)
@@ -94,13 +93,13 @@ def high_feature_analysis(data_level=DATA_LEVELS[1]):
 
             elif n != 9 and n != 11:
                 ax.hist(data[signal, n], bins=50, histtype='step', label='signal', color='r',
-                              weights=np.zeros_like(data[signal, n]) + 1. / data[signal, n].size)
+                        weights=np.zeros_like(data[signal, n]) + 1. / data[signal, n].size)
                 ax.hist(data[background, n], bins=50, histtype='step', label='background', color='k',
-                              weights=np.zeros_like(data[background, n]) + 1. / data[background, n].size)
-                ax.set_ylabel("Fraction of events", fontsize=12)
-                ax.set_xlabel(str(feature_names[n]), fontsize=12)
+                        weights=np.zeros_like(data[background, n]) + 1. / data[background, n].size)
+                ax.set_ylabel("Fraction of events", fontsize=10)
+                ax.set_xlabel(str(feature_names[n]), fontsize=10)
 
-                Line, Label = ax.get_legend_handles_labels()
+                line, label = ax.get_legend_handles_labels()
 
                 if n == 0:
                     ax.set_xlim(0, 300)
@@ -137,13 +136,15 @@ def high_feature_analysis(data_level=DATA_LEVELS[1]):
             else:
                 fig.delaxes(ax)
 
-    fig.suptitle("Distribution of "+ data_level[1] + " level features of the SUSY data set", fontsize=12)
-    fig.legend(Line, Label, loc='lower right', fontsize=12)
+    fig.suptitle("Distribution of " + data_level[1] + " level features of the SUSY data set", fontsize=12)
+    fig.legend(line, label, bbox_to_anchor=[0.86, 0.24], fontsize=12)
+    fig.tight_layout()
 
-    plt.savefig("Features/" + data_level[1] + "_level.pdf")
+    plt.savefig("Features/" + data_level[1] + "_level.pdf", dpi=300)
     plt.show()
 
     return 0
+
 
 def main():
     low_feature_analysis()

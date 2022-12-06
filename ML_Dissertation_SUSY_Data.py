@@ -9,8 +9,8 @@ from sklearn.metrics import roc_curve
 from sklearn.metrics import auc as area_under_curve
 from tensorflow import keras
 
-FILE_DIR = "SUSY.csv"
-EPOCHS, BATCH = 150, 100
+FILE_DIR = "SUSY.csv.gz"
+EPOCHS, BATCH = 150, 200
 
 low = [np.arange(1, 9), "low"]  # Defines the column indexes for the low-level data.
 high = [np.arange(9, 19), "high"]  # Defines the column indexes for the high-level data.
@@ -49,10 +49,10 @@ def test_and_train(col_num, file_name=FILE_DIR):
     :param file_name: String containing the file location
     :return: Arrays containing the data and labels that are used to train and test the model
     """
-    data = pd.read_csv(file_name, usecols=col_num)
-    label = pd.read_csv(file_name, usecols=[0]).astype(int)
+    data = pd.read_csv(file_name, usecols=col_num, nrows=100000, compression='gzip')
+    label = pd.read_csv(file_name, usecols=[0], nrows=100000, compression='gzip').astype(int)
 
-    data = keras.utils.normalize(data, axis=1)
+    data = keras.utils.normalize(data, axis=-1)
     x_train, x_test, y_train, y_test = train_test_split(data, label, test_size=0.2)
 
     return x_train, x_test, y_train, y_test
@@ -98,7 +98,7 @@ def compiler(model):
     :param model: The model.
     :return: The compiled model.
     """
-    sgd = keras.optimizers.SGD(learning_rate=0.05, decay=1e-6, momentum=0.9)
+    sgd = keras.optimizers.SGD(learning_rate=0.025, decay=1e-6, momentum=0.9)
 
     model.compile(loss='binary_crossentropy',
                   optimizer=sgd,
@@ -230,7 +230,3 @@ def pca_main():
     results.to_csv("PCA_Results.csv", index=False)
 
     return 0
-
-
-main()
-# pca_main()

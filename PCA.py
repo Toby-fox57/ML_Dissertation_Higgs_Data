@@ -5,17 +5,17 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import normalize as normalise
 
-file_dir = "SUSY.csv"
+FILE_DIR = "SUSY.csv.gz"
 
-low = [np.arange(1, 9), "low"]  # Defines the column indexes for the low-level data.
-high = [np.arange(9, 19), "high"]  # Defines the column indexes for the high-level data.
+low = [np.arange(1, 9), "low-level"]  # Defines the column indexes for the low-level data.
+high = [np.arange(9, 19), "high-level"]  # Defines the column indexes for the high-level data.
 combined = [np.arange(1, 19), "combined"]  # Defines the column indexes for the combined data.
 
-data_levels = [low, high, combined]
+DATA_LEVELS = [low, high, combined]
 
 
-def file_importer(col_num, file_name):
-    data = pd.read_csv(file_name, usecols=col_num).astype(float)
+def file_importer(col_num, file_name=FILE_DIR):
+    data = pd.read_csv(file_name, nrows=100000, usecols=col_num, compression='gzip')
     data = data.to_numpy()
 
     data = normalise(data)
@@ -31,32 +31,48 @@ def pca_calculator(data):
     return pca_variance, pca_ratio
 
 
-def plotter(data_level, pca_variance):
-    principle_component = np.arange(1, len(data_level[0]) + 1)
+def cum_ratio(data_level, pca_ratio):
+    ratios = np.cumsum(pca_ratio).tolist()
+    ratios = ratios + ([''] * (18 - len(data_level[0])))
 
-    plt.bar(principle_component, pca_variance)
-    plt.xlabel("Principal Components", fontsize=12)
-    plt.ylabel("Variance", fontsize=12)
-    plt.title("Principal Component Analysis of " + data_level[1] + "-level features", fontsize=12)
-    plt.xticks(np.arange(1, len(data_level[0]) + 1))
+    ratio_csv = pd.read_csv("PCA/PCA_ratios.csv")
+    ratio_csv[data_level[1]] = ratios
+    ratio_csv.to_csv("PCA/PCA_ratios.csv", index=False)
 
-    plt.savefig("PCA\PCA_" + data_level[1] + ".pdf")
+
+def main(data_levels=DATA_LEVELS):
+    fig, axes = plt.subplots(2, 2)
+
+    for m, col in enumerate(axes):
+        for n, ax in enumerate(col):
+
+            i = n + 2 * m
+
+            if i != 3:
+                data_level = data_levels[i]
+
+                data = file_importer(data_level[0])
+                pca_variance, pca_ratio = pca_calculator(data)
+
+                cum_ratio(data_level, pca_ratio)
+
+                principle_component = np.arange(1, len(data_level[0]) + 1)
+
+                ax.bar(principle_component, pca_variance)
+                ax.set_xlabel("Principal Components", fontsize=12)
+                ax.set_ylabel("Variance", fontsize=12)
+                ax.set_xticks(np.arange(1, len(data_level[0]) + 1))
+                ax.set_xlim(0, 8.5)
+                ax.set_title(data_level[1] + " features", fontsize=12)
+
+            else:
+                fig.delaxes(ax)
+
+    fig.suptitle("Principal Component Analysis")
+
+    plt.tight_layout()
+    plt.savefig("PCA\PCA.pdf", dpi=300)
     plt.show()
 
 
-def cum_ratio(data_level, pca_ratio):
-    principle_component, ratios = np.arange(1, len(data_level[0]) + 1), np.cumsum(pca_ratio)
-
-    ratios = pd.DataFrame({'Principal Component': principle_component, 'Variance Ratio': ratios})
-    ratios.to_csv("PCA/"+data_level[1]+"_ratios.csv", index=False)
-
-
-def main(data_level):
-    data = file_importer(data_level[0], file_dir)
-    pca_variance, pca_ratio = pca_calculator(data)
-    plotter(data_level, pca_variance)
-    cum_ratio(data_level, pca_ratio)
-
-
-for level in data_levels:
-    main(level)
+main()
